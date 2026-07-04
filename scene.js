@@ -1,6 +1,7 @@
 // ─── Birthday cake (pixel-identical traced map) ────────────────────────────
 const BLOW_HOLD_MS = 3500;
-const SMOKE_DURATION_MS = 3200;
+const SMOKE_DURATION_MS = 5200;
+const SMOKE_HEADROOM = 32;
 
 const cakeInteract = {
   base: null,
@@ -30,6 +31,40 @@ function buildCakeSpriteFromEmbedded(data) {
   }
   c.putImageData(img, 0, 0);
   return canvas;
+}
+
+function cropCanvasToOpaque(sourceCanvas) {
+  const sw = sourceCanvas.width;
+  const sh = sourceCanvas.height;
+  const src = sourceCanvas.getContext('2d').getImageData(0, 0, sw, sh).data;
+  let minX = sw;
+  let minY = sh;
+  let maxX = 0;
+  let maxY = 0;
+
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      if (src[(y * sw + x) * 4 + 3] <= 20) continue;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    return { canvas: sourceCanvas, offsetX: 0, offsetY: 0 };
+  }
+
+  const cw = maxX - minX + 1;
+  const ch = maxY - minY + 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sourceCanvas, minX, minY, cw, ch, 0, 0, cw, ch);
+  return { canvas, offsetX: minX, offsetY: minY };
 }
 
 function isFlamePixel(r, g, b, y, h) {
@@ -108,7 +143,8 @@ function initCakeInteract(baseCanvas) {
   cakeInteract.base = baseCanvas;
   cakeInteract.display = document.createElement('canvas');
   cakeInteract.display.width = w;
-  cakeInteract.display.height = h;
+  cakeInteract.display.height = h + SMOKE_HEADROOM;
+  cakeInteract.smokeHeadroom = SMOKE_HEADROOM;
   cakeInteract.flamePixels = flamePixels;
   cakeInteract.flamePixelSet = new Set(flamePixels.map((p) => p.y * w + p.x));
   cakeInteract.extinguishPixels = collectExtinguishPixels(src, w, h, flamePixels);
@@ -120,10 +156,11 @@ function initCakeInteract(baseCanvas) {
 
 function spawnSmokePuffs() {
   const { x, y } = cakeInteract.flameOrigin;
+  const baseY = y + cakeInteract.smokeHeadroom;
   for (let i = 0; i < 10; i++) {
     cakeInteract.smokePuffs.push({
       x: x + (Math.random() - 0.5) * 6,
-      y: y + Math.random() * 2,
+      y: baseY + Math.random() * 2,
       vy: -0.22 - Math.random() * 0.18,
       vx: (Math.random() - 0.5) * 0.08,
       life: 0,
@@ -145,6 +182,7 @@ function updateCakeInteract(now, dt) {
       cakeInteract.blownOut = true;
       cakeInteract.pointerId = null;
       spawnSmokePuffs();
+      showBirthdayMessage();
     }
   } else if (!cakeInteract.blownOut && cakeInteract.blowProgress > 0) {
     cakeInteract.blowProgress = Math.max(0, cakeInteract.blowProgress - dt / 350);
@@ -173,10 +211,11 @@ function renderCakeDisplay() {
   const canvas = cakeInteract.display;
   const w = canvas.width;
   const h = canvas.height;
+  const head = cakeInteract.smokeHeadroom;
   const cx = canvas.getContext('2d');
   cx.imageSmoothingEnabled = false;
   cx.clearRect(0, 0, w, h);
-  cx.drawImage(cakeInteract.base, 0, 0);
+  cx.drawImage(cakeInteract.base, 0, head);
 
   const img = cx.getImageData(0, 0, w, h);
   const d = img.data;
@@ -184,7 +223,7 @@ function renderCakeDisplay() {
   const progress = cakeInteract.blowProgress;
 
   for (const p of cakeInteract.extinguishPixels) {
-    const i = (p.y * w + p.x) * 4;
+    const i = ((p.y + head) * w + p.x) * 4;
     const isFlame = cakeInteract.flamePixelSet.has(p.y * w + p.x);
 
     if (cakeInteract.blownOut) {
@@ -253,13 +292,33 @@ async function loadCakeSprite() {
   const res = await fetch('assets/cake-embedded.json', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to load cake data: ${res.status}`);
   const data = await res.json();
-  const base = buildCakeSpriteFromEmbedded(data);
+  const raw = buildCakeSpriteFromEmbedded(data);
+  const { canvas: base, offsetX, offsetY } = cropCanvasToOpaque(raw);
+  cakeInteract.candleHit = {
+    x: 34 - offsetX,
+    y: Math.max(0, -offsetY),
+    w: 14,
+    h: 28,
+  };
   initCakeInteract(base);
   return renderCakeDisplay();
 }
 
+// ─── Birthday message ──────────────────────────────────────────────────────
+function showBirthdayMessage() {
+  const message = document.getElementById('birthday-message');
+  if (!message || message.classList.contains('visible')) return;
+  document.body.classList.add('message-visible');
+  message.classList.add('visible');
+  const copy = message.querySelector('.birthday-copy');
+  if (copy) copy.setAttribute('aria-hidden', 'false');
+  resize();
+}
+
 // ─── Scene layout ──────────────────────────────────────────────────────────
 const canvas = document.getElementById('scene-canvas');
+const cakeSlot = document.getElementById('cake-slot');
+const pageEl = document.querySelector('.page');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
@@ -270,6 +329,10 @@ let lastFrameTime = 0;
 
 function spriteReady() {
   return cakeSprite !== null;
+}
+
+function messageIsVisible() {
+  return document.body.classList.contains('message-visible');
 }
 
 function getViewportSize() {
@@ -302,30 +365,42 @@ function getLayoutConfig(viewportW, viewportH) {
     if (fitsW && fitsH) pixelScale = 2;
   }
 
-  return { pixelScale, padSide, padTop, padBottom };
+  return { pixelScale };
 }
 
 function measureLayout() {
   if (!spriteReady()) return null;
 
   const { w: viewportW, h: viewportH } = getViewportSize();
-  const { pixelScale, padSide, padTop, padBottom } = getLayoutConfig(viewportW, viewportH);
+  const { pixelScale } = getLayoutConfig(viewportW, viewportH);
 
   const w = cakeSprite.width * pixelScale;
   const h = cakeSprite.height * pixelScale;
-  const sceneW = w + padSide * 2;
-  const sceneH = h + padTop + padBottom;
 
   const item = {
     key: 'cake',
     sprite: cakeSprite,
     w,
     h,
-    x: padSide,
-    y: padTop,
+    x: 0,
+    y: 0,
   };
 
-  return { item, sceneW, sceneH, pixelScale };
+  return { item, sceneW: w, sceneH: h, pixelScale };
+}
+
+function updateCakeWrapMetrics(displayW, displayH) {
+  if (!messageIsVisible() || !pageEl) return;
+
+  const style = getComputedStyle(pageEl);
+  const padTop = parseFloat(style.paddingTop) || 0;
+  const padBottom = parseFloat(style.paddingBottom) || 0;
+  const contentH = pageEl.clientHeight - padTop - padBottom;
+  const cakeTop = Math.max(0, Math.round((contentH - displayH) / 2));
+
+  document.documentElement.style.setProperty('--cake-w', `${displayW}px`);
+  document.documentElement.style.setProperty('--cake-h', `${displayH}px`);
+  document.documentElement.style.setProperty('--cake-top', `${cakeTop}px`);
 }
 
 function scenePointFromClient(clientX, clientY) {
@@ -341,8 +416,8 @@ function scenePointFromClient(clientX, clientY) {
 function spritePointFromScene(sceneX, sceneY) {
   const scale = layout.pixelScale;
   return {
-    x: (sceneX - layout.item.x) / scale,
-    y: (sceneY - layout.item.y) / scale,
+    x: sceneX / scale,
+    y: sceneY / scale,
   };
 }
 
@@ -350,10 +425,11 @@ function hitCandle(sceneX, sceneY) {
   if (!layout || cakeInteract.blownOut) return false;
   const local = spritePointFromScene(sceneX, sceneY);
   const hit = cakeInteract.candleHit;
+  const head = cakeInteract.smokeHeadroom || 0;
   return local.x >= hit.x
     && local.x < hit.x + hit.w
-    && local.y >= hit.y
-    && local.y < hit.y + hit.h;
+    && local.y >= hit.y + head
+    && local.y < hit.y + head + hit.h;
 }
 
 function startCandleHold(pointerId, clientX, clientY) {
@@ -407,14 +483,21 @@ function resize() {
   const { w: viewportW, h: viewportH } = getViewportSize();
   const fitScale = Math.min(viewportW / sceneW, viewportH / sceneH);
   const displayScale = Math.max(1, Math.floor(fitScale));
+  const displayW = sceneW * displayScale;
+  const displayH = sceneH * displayScale;
 
-  canvas.width = sceneW * displayScale;
-  canvas.height = sceneH * displayScale;
-  canvas.style.width = `${sceneW * displayScale}px`;
-  canvas.style.height = `${sceneH * displayScale}px`;
+  canvas.width = displayW;
+  canvas.height = displayH;
+  canvas.style.width = `${displayW}px`;
+  canvas.style.height = `${displayH}px`;
+  if (cakeSlot) {
+    cakeSlot.style.width = `${displayW}px`;
+    cakeSlot.style.height = `${displayH}px`;
+  }
 
   ctx.setTransform(displayScale, 0, 0, displayScale, 0, 0);
   cakeInteract.displayScale = displayScale;
+  updateCakeWrapMetrics(displayW, displayH);
   cakeSprite = renderCakeDisplay();
   drawScene();
 }
@@ -425,8 +508,7 @@ function drawScene() {
   const { item, sceneW, sceneH } = layout;
   const sprite = renderCakeDisplay();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, sceneW, sceneH);
+  ctx.clearRect(0, 0, sceneW, sceneH);
   ctx.drawImage(
     sprite,
     0, 0, sprite.width, sprite.height,

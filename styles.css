@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Pixelated Display';
+  src: url('assets/fonts/PixelatedDisplay.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,6 +18,12 @@ body {
   height: 100%;
   overflow: hidden;
   background: #ffffff;
+  min-height: 100dvh;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,18 +32,108 @@ body {
     env(safe-area-inset-right)
     env(safe-area-inset-bottom)
     env(safe-area-inset-left);
-  min-height: 100dvh;
-  touch-action: manipulation;
-  -webkit-text-size-adjust: 100%;
+}
+
+body.message-visible {
+  display: block;
+  padding: 0;
+}
+
+.page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+body:not(.message-visible) .page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.message-visible .page {
+  height: 100dvh;
+  overflow: hidden;
+  padding:
+    calc(env(safe-area-inset-top) + 1rem)
+    calc(env(safe-area-inset-right) + 1.25rem)
+    calc(env(safe-area-inset-bottom) + 1rem)
+    calc(env(safe-area-inset-left) + 1.25rem);
+}
+
+.birthday-message {
+  position: relative;
+}
+
+body:not(.message-visible) .birthday-message {
+  display: block;
+}
+
+body.message-visible .birthday-message {
+  height: 100%;
+  overflow: hidden;
+}
+
+.cake-slot {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Cake participates in text flow so copy can wrap around it */
+body.message-visible .cake-slot {
+  float: right;
+  width: var(--cake-w, auto);
+  height: var(--cake-h, auto);
+  margin-top: var(--cake-top, 0px);
+  margin-right: max(0px, calc(50% - (var(--cake-w, 0px) / 2)));
+  margin-bottom: 1rem;
+  margin-left: 1rem;
+  shape-outside: margin-box;
+  shape-margin: 0.75rem;
 }
 
 #scene-canvas {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   -ms-interpolation-mode: nearest-neighbor;
   touch-action: none;
   cursor: default;
+}
+
+.birthday-copy {
+  display: none;
+  font-family: 'Pixelated Display', monospace;
+  font-weight: 400;
+  font-size: clamp(1.75rem, 7vw, 3.25rem);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  text-align: left;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+body.message-visible .birthday-copy {
+  display: block;
+}
+
+.birthday-message.visible .birthday-copy {
+  opacity: 1;
+}
+
+.birthday-title {
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: 2em;
+  line-height: 1.15;
+  letter-spacing: inherit;
+  color: inherit;
 }
