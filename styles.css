@@ -20,6 +20,7 @@ body {
   min-height: 100dvh;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
+  -webkit-touch-callout: none;
 }
 
 body {
@@ -39,6 +40,8 @@ body.intro-active {
 
 body.cake-active {
   background: #ffffff;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ─── Intro screen ─────────────────────────────────────────────────────────── */
@@ -177,6 +180,9 @@ body.cake-active {
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .main-screen[hidden] {
@@ -272,6 +278,9 @@ body.cake-active {
   image-rendering: crisp-edges;
   -ms-interpolation-mode: nearest-neighbor;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   cursor: default;
 }
 
@@ -370,6 +379,10 @@ body.cake-active {
   color: #2a2a2a;
   resize: none;
   outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+  -webkit-touch-callout: default;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: unset;
   font-smooth: never;

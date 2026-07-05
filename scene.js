@@ -817,6 +817,10 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 });
 
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
+
 canvas.addEventListener('pointerup', (e) => {
   endCandleHold(e.pointerId);
 });
