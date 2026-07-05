@@ -304,21 +304,16 @@ async function loadCakeSprite() {
   return renderCakeDisplay();
 }
 
-// ─── Birthday message ──────────────────────────────────────────────────────
+// ─── Birthday title ────────────────────────────────────────────────────────
 function showBirthdayMessage() {
-  const message = document.getElementById('birthday-message');
-  if (!message || message.classList.contains('visible')) return;
-  document.body.classList.add('message-visible');
-  message.classList.add('visible');
-  const copy = message.querySelector('.birthday-copy');
-  if (copy) copy.setAttribute('aria-hidden', 'false');
-  resize();
+  const title = document.getElementById('birthday-title');
+  if (!title || title.classList.contains('visible')) return;
+  title.classList.add('visible');
+  title.setAttribute('aria-hidden', 'false');
 }
 
 // ─── Scene layout ──────────────────────────────────────────────────────────
 const canvas = document.getElementById('scene-canvas');
-const cakeSlot = document.getElementById('cake-slot');
-const pageEl = document.querySelector('.page');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
@@ -329,10 +324,6 @@ let lastFrameTime = 0;
 
 function spriteReady() {
   return cakeSprite !== null;
-}
-
-function messageIsVisible() {
-  return document.body.classList.contains('message-visible');
 }
 
 function getViewportSize() {
@@ -387,20 +378,6 @@ function measureLayout() {
   };
 
   return { item, sceneW: w, sceneH: h, pixelScale };
-}
-
-function updateCakeWrapMetrics(displayW, displayH) {
-  if (!messageIsVisible() || !pageEl) return;
-
-  const style = getComputedStyle(pageEl);
-  const padTop = parseFloat(style.paddingTop) || 0;
-  const padBottom = parseFloat(style.paddingBottom) || 0;
-  const contentH = pageEl.clientHeight - padTop - padBottom;
-  const cakeTop = Math.max(0, Math.round((contentH - displayH) / 2));
-
-  document.documentElement.style.setProperty('--cake-w', `${displayW}px`);
-  document.documentElement.style.setProperty('--cake-h', `${displayH}px`);
-  document.documentElement.style.setProperty('--cake-top', `${cakeTop}px`);
 }
 
 function scenePointFromClient(clientX, clientY) {
@@ -490,14 +467,9 @@ function resize() {
   canvas.height = displayH;
   canvas.style.width = `${displayW}px`;
   canvas.style.height = `${displayH}px`;
-  if (cakeSlot) {
-    cakeSlot.style.width = `${displayW}px`;
-    cakeSlot.style.height = `${displayH}px`;
-  }
 
   ctx.setTransform(displayScale, 0, 0, displayScale, 0, 0);
   cakeInteract.displayScale = displayScale;
-  updateCakeWrapMetrics(displayW, displayH);
   cakeSprite = renderCakeDisplay();
   drawScene();
 }
