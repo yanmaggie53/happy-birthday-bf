@@ -1,5 +1,6 @@
 // ─── Birthday cake (pixel-identical traced map) ────────────────────────────
-const BLOW_HOLD_MS = 3500;
+const BLOW_WINDOW_MS = 5000;
+const TAPS_TO_BLOW = 30;
 const SMOKE_DURATION_MS = 5200;
 const SMOKE_HEADROOM = 32;
 
@@ -10,13 +11,13 @@ const cakeInteract = {
   candleHit: { x: 34, y: 0, w: 14, h: 28 },
   flameOrigin: { x: 39, y: 8 },
   blownOut: false,
-  holding: false,
-  holdStart: 0,
+  blowSessionActive: false,
+  blowSessionStart: 0,
+  tapCount: 0,
   blowProgress: 0,
   flickerT: 0,
   smokePuffs: [],
   displayScale: 1,
-  pointerId: null,
 };
 
 function buildCakeSpriteFromEmbedded(data) {
@@ -149,9 +150,19 @@ function initCakeInteract(baseCanvas) {
   cakeInteract.flamePixelSet = new Set(flamePixels.map((p) => p.y * w + p.x));
   cakeInteract.extinguishPixels = collectExtinguishPixels(src, w, h, flamePixels);
   cakeInteract.blownOut = false;
-  cakeInteract.holding = false;
+  cakeInteract.blowSessionActive = false;
+  cakeInteract.blowSessionStart = 0;
+  cakeInteract.tapCount = 0;
   cakeInteract.blowProgress = 0;
   cakeInteract.smokePuffs = [];
+}
+
+function completeBlowOut() {
+  cakeInteract.blowProgress = 1;
+  cakeInteract.blowSessionActive = false;
+  cakeInteract.blownOut = true;
+  spawnSmokePuffs();
+  showCelebration();
 }
 
 function spawnSmokePuffs() {
@@ -174,15 +185,15 @@ function spawnSmokePuffs() {
 function updateCakeInteract(now, dt) {
   cakeInteract.flickerT += dt;
 
-  if (cakeInteract.holding && !cakeInteract.blownOut) {
-    cakeInteract.blowProgress = Math.min(1, (now - cakeInteract.holdStart) / BLOW_HOLD_MS);
+  if (cakeInteract.blowSessionActive && !cakeInteract.blownOut) {
+    const elapsed = now - cakeInteract.blowSessionStart;
+    cakeInteract.blowProgress = Math.min(1, cakeInteract.tapCount / TAPS_TO_BLOW);
     if (cakeInteract.blowProgress >= 1) {
-      cakeInteract.blowProgress = 1;
-      cakeInteract.holding = false;
-      cakeInteract.blownOut = true;
-      cakeInteract.pointerId = null;
-      spawnSmokePuffs();
-      showCelebration();
+      completeBlowOut();
+    } else if (elapsed >= BLOW_WINDOW_MS) {
+      cakeInteract.blowSessionActive = false;
+      cakeInteract.tapCount = 0;
+      cakeInteract.blowProgress = 0;
     }
   } else if (!cakeInteract.blownOut && cakeInteract.blowProgress > 0) {
     cakeInteract.blowProgress = Math.max(0, cakeInteract.blowProgress - dt / 350);
@@ -198,7 +209,7 @@ function updateCakeInteract(now, dt) {
 }
 
 function cakeNeedsAnimation() {
-  if (cakeInteract.holding) return true;
+  if (cakeInteract.blowSessionActive) return true;
   if (!cakeInteract.blownOut && cakeInteract.blowProgress > 0) return true;
   if (cakeInteract.smokePuffs.length > 0) return true;
   if (!cakeInteract.blownOut) return true;
@@ -231,10 +242,10 @@ function renderCakeDisplay() {
       continue;
     }
 
-    if (progress <= 0 && !cakeInteract.holding) continue;
+    if (progress <= 0 && !cakeInteract.blowSessionActive) continue;
 
     const flicker = isFlame
-      ? (cakeInteract.holding
+      ? (cakeInteract.blowSessionActive
         ? 0.55 + 0.45 * Math.sin(t * 0.028 + p.x * 1.7 + p.y * 2.3)
         : 0.78 + 0.22 * Math.sin(t * 0.011 + p.x * 0.9 + p.y))
       : 1;
@@ -705,29 +716,33 @@ function hitCandle(sceneX, sceneY) {
     && local.y < hit.y + head + hit.h;
 }
 
-function startCandleHold(pointerId, clientX, clientY) {
+function tapFlame(clientX, clientY) {
+  if (cakeInteract.blownOut) return false;
   const pt = scenePointFromClient(clientX, clientY);
   if (!hitCandle(pt.x, pt.y)) return false;
 
-  cakeInteract.holding = true;
-  cakeInteract.holdStart = performance.now();
-  cakeInteract.pointerId = pointerId;
+  const now = performance.now();
+  if (!cakeInteract.blowSessionActive) {
+    cakeInteract.blowSessionActive = true;
+    cakeInteract.blowSessionStart = now;
+    cakeInteract.tapCount = 0;
+  }
+
+  if (now - cakeInteract.blowSessionStart < BLOW_WINDOW_MS) {
+    cakeInteract.tapCount++;
+    cakeInteract.blowProgress = Math.min(1, cakeInteract.tapCount / TAPS_TO_BLOW);
+    if (cakeInteract.blowProgress >= 1) {
+      completeBlowOut();
+    }
+  }
+
   startOverlayLoop();
   return true;
 }
 
-function endCandleHold(pointerId) {
-  if (cakeInteract.pointerId !== pointerId) return;
-  cakeInteract.holding = false;
-  cakeInteract.pointerId = null;
-  if (!cakeInteract.blownOut && cakeInteract.blowProgress < 1) {
-    startOverlayLoop();
-  }
-}
-
 function needsAnimationFrame() {
   if (confetti.active) return true;
-  if (mainScreenActive() && (cakeNeedsAnimation() || cakeInteract.holding)) return true;
+  if (mainScreenActive() && cakeNeedsAnimation()) return true;
   return false;
 }
 
@@ -810,22 +825,9 @@ function drawScene() {
 
 canvas.addEventListener('pointerdown', (e) => {
   if (!mainScreenActive() || !layout || !spriteReady()) return;
-  if (startCandleHold(e.pointerId, e.clientX, e.clientY)) {
+  if (tapFlame(e.clientX, e.clientY)) {
     e.preventDefault();
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
-});
-
-canvas.addEventListener('pointerup', (e) => {
-  endCandleHold(e.pointerId);
-});
-
-canvas.addEventListener('pointercancel', (e) => {
-  endCandleHold(e.pointerId);
-});
-
-canvas.addEventListener('pointerleave', (e) => {
-  if (cakeInteract.pointerId === e.pointerId) endCandleHold(e.pointerId);
 });
 
 window.addEventListener('resize', resize);
