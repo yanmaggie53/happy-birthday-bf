@@ -17,7 +17,6 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
   min-height: 100dvh;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
@@ -34,42 +33,237 @@ body {
     env(safe-area-inset-left);
 }
 
-.page {
+body.intro-active {
+  background: #000000;
+}
+
+body.cake-active {
+  background: #ffffff;
+}
+
+/* ─── Intro screen ─────────────────────────────────────────────────────────── */
+.intro-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
+  background: #000000;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
 }
 
-.birthday-title {
+.intro-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.light-switch {
+  position: relative;
+  width: 48px;
+  height: 76px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.light-switch__plate {
+  display: block;
+  width: 48px;
+  height: 76px;
+  background: #c8c8c8;
+  border: 3px solid #5a5a5a;
+  box-shadow:
+    inset 2px 2px 0 #e8e8e8,
+    inset -2px -2px 0 #707070,
+    4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.light-switch__rocker {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  background: #f0f0f0;
+  border: 2px solid #5a5a5a;
+  box-shadow: inset 1px 1px 0 #ffffff;
+  transition: top 0.12s steps(2, end), background 0.12s steps(2, end);
+}
+
+.light-switch.on .light-switch__rocker {
+  top: 36px;
+  background: #ffe566;
+}
+
+/* ─── Hints ────────────────────────────────────────────────────────────────── */
+.hint {
   font-family: 'Pixelated Display', monospace;
   font-weight: 400;
-  font-size: clamp(1.75rem, 7vw, 3.25rem);
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  color: #2a2a2a;
+  color: #ffffff;
   text-align: center;
-  white-space: nowrap;
-  max-height: 0;
-  margin: 0;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(0.5rem);
-  transition:
-    opacity 0.9s ease,
-    transform 0.9s ease,
-    max-height 0.9s ease,
-    margin-bottom 0.9s ease;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: unset;
   font-smooth: never;
 }
 
-.birthday-title.visible {
-  max-height: 5rem;
-  margin-bottom: 1rem;
+.hint--intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.hint--intro .hint__text {
+  font-size: 18px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.hint--intro .hint__arrow {
+  font-size: 14px;
+  line-height: 1;
+  animation: hint-bob 1.2s steps(2, end) infinite;
+}
+
+.hint--blow {
+  position: fixed;
+  z-index: 40;
+  left: 50%;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: min(280px, calc(100vw - 2rem));
+  pointer-events: none;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.hint--blow .hint__text {
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+}
+
+.hint--blow .hint__arrow {
+  font-size: 12px;
+  line-height: 1;
+  color: #2a2a2a;
+  animation: hint-bob 1.2s steps(2, end) infinite;
+}
+
+.hint--blow.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@keyframes hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ─── Main cake screen ─────────────────────────────────────────────────────── */
+.main-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-screen[hidden] {
+  display: none;
+}
+
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.above-cake-title {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: auto;
+  max-width: calc(100vw - 2rem);
+  margin-bottom: 0.5rem;
+  transform: translateX(-50%);
+}
+
+.surprise-text {
   opacity: 1;
-  transform: translateY(0);
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.surprise-text.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.celebration-text {
+  position: fixed;
+  left: 50%;
+  bottom: auto;
+  width: auto;
+  max-width: calc(100vw - 2rem);
+  justify-content: flex-start;
+  gap: 0.5rem;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(0.5rem);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+
+.celebration-text.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.birthday-title {
+  font-family: 'Pixelated Display', monospace;
+  font-weight: 400;
+  font-size: var(--title-size, 32px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+.birthday-note {
+  font-family: 'Pixelated Display', monospace;
+  font-weight: 400;
+  font-size: var(--note-size, 11px);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  text-align: center;
+  width: var(--note-width, auto);
+  max-width: var(--note-width, none);
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
 }
 
 #scene-canvas {
@@ -79,4 +273,126 @@ body {
   -ms-interpolation-mode: nearest-neighbor;
   touch-action: none;
   cursor: default;
+}
+
+/* ─── Confetti ─────────────────────────────────────────────────────────────── */
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ─── Wish button & sticky note ────────────────────────────────────────────── */
+.wish-button {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  padding: 0.5rem 1rem;
+  border: 2px solid #5a5a5a;
+  background: #f5f5f5;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+  font-family: 'Pixelated Display', monospace;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  cursor: pointer;
+  touch-action: manipulation;
+  opacity: 0;
+  transform: translateX(-50%) translateY(0.5rem);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+.wish-button.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.wish-button[hidden] {
+  display: none;
+}
+
+.wish-note-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.wish-note-overlay[hidden] {
+  display: none;
+}
+
+.sticky-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(300px, calc(100vw - 2.5rem));
+  padding: 1rem 1rem 0.85rem;
+  background: #fff9a8;
+  border: 2px solid #c9bc4b;
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-1.5deg);
+}
+
+.sticky-note__label {
+  font-family: 'Pixelated Display', monospace;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #3a3a3a;
+  text-align: center;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+.sticky-note__input {
+  width: 100%;
+  min-height: 120px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: 'Pixelated Display', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  resize: none;
+  outline: none;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+.sticky-note__input::placeholder {
+  color: #7a7a7a;
+}
+
+.sticky-note__submit {
+  align-self: center;
+  padding: 0.4rem 0.9rem;
+  border: 2px solid #5a5a5a;
+  background: #ffffff;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
+  font-family: 'Pixelated Display', monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #2a2a2a;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
 }

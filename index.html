@@ -6,11 +6,56 @@
   <title>Happy Birthday</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <div class="page">
-    <h1 id="birthday-title" class="birthday-title" aria-hidden="true">Happy Birthday!</h1>
-    <canvas id="scene-canvas"></canvas>
+<body class="intro-active">
+  <div id="intro-screen" class="intro-screen">
+    <div class="hint hint--intro">
+      <p class="hint__text">turn on the light</p>
+      <span class="hint__arrow" aria-hidden="true">▼</span>
+    </div>
+    <button id="light-switch" class="light-switch" type="button" aria-label="Turn on the light">
+      <span class="light-switch__plate" aria-hidden="true"></span>
+      <span class="light-switch__rocker" aria-hidden="true"></span>
+    </button>
   </div>
+
+  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+
+  <div id="main-screen" class="main-screen" hidden>
+    <div class="page">
+      <canvas id="scene-canvas"></canvas>
+      <div id="surprise-text" class="above-cake-title surprise-text">
+        <h1 id="surprise-title" class="birthday-title">surpriseeeeeee</h1>
+      </div>
+      <div id="celebration-text" class="above-cake-title celebration-text" aria-hidden="true">
+        <h1 id="birthday-title" class="birthday-title">Happy Birthday!</h1>
+        <p id="birthday-note" class="birthday-note">
+          while I wish for you to have a day full of joy, happiness, and all that güd stuffgde,
+          I actually wish for you to have that everyday because you are my special baby and you
+          deserve the best <333
+        </p>
+      </div>
+    </div>
+    <div id="blow-hint" class="hint hint--blow">
+      <p class="hint__text">hold down on the flame to blow out the candle</p>
+      <span class="hint__arrow" aria-hidden="true">▼</span>
+    </div>
+    <button id="wish-button" class="wish-button" type="button" hidden>make a wish?</button>
+  </div>
+
+  <div id="wish-note-overlay" class="wish-note-overlay" hidden>
+    <div class="sticky-note" role="dialog" aria-labelledby="sticky-note-label">
+      <p id="sticky-note-label" class="sticky-note__label">make a wish</p>
+      <textarea
+        id="wish-input"
+        class="sticky-note__input"
+        rows="6"
+        maxlength="500"
+        placeholder="type your wish here..."
+      ></textarea>
+      <button id="wish-submit" class="sticky-note__submit" type="button">submit</button>
+    </div>
+  </div>
+
   <script src="scene.js"></script>
 </body>
 </html>

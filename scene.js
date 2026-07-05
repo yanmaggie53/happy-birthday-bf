@@ -182,7 +182,7 @@ function updateCakeInteract(now, dt) {
       cakeInteract.blownOut = true;
       cakeInteract.pointerId = null;
       spawnSmokePuffs();
-      showBirthdayMessage();
+      showCelebration();
     }
   } else if (!cakeInteract.blownOut && cakeInteract.blowProgress > 0) {
     cakeInteract.blowProgress = Math.max(0, cakeInteract.blowProgress - dt / 350);
@@ -304,12 +304,318 @@ async function loadCakeSprite() {
   return renderCakeDisplay();
 }
 
-// ─── Birthday title ────────────────────────────────────────────────────────
-function showBirthdayMessage() {
+// ─── App flow, hints, confetti, celebration ────────────────────────────────
+const TITLE_MIN_PX = 16;
+const TITLE_MAX_PX = 52;
+const TITLE_HPAD_PX = 32;
+const NOTE_MIN_PX = 8;
+
+function getTitleSizePx() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--title-size').trim();
+  const parsed = parseFloat(raw);
+  if (parsed) return parsed;
   const title = document.getElementById('birthday-title');
-  if (!title || title.classList.contains('visible')) return;
-  title.classList.add('visible');
-  title.setAttribute('aria-hidden', 'false');
+  return title ? parseFloat(getComputedStyle(title).fontSize) : TITLE_MIN_PX;
+}
+
+const CONFETTI_COLORS = [
+  '#f94144', '#f3722c', '#f8961e', '#f9c74f',
+  '#90be6d', '#43aa8b', '#577590', '#ff6bcb', '#b5179e',
+];
+
+const confetti = { particles: [], active: false };
+let awaitingCelebrationConfettiEnd = false;
+let wishButtonShown = false;
+
+let overlayFrame = null;
+let lastFrameTime = 0;
+
+function mainScreenActive() {
+  const main = document.getElementById('main-screen');
+  return main && !main.hidden;
+}
+
+function getViewportSize() {
+  const vv = window.visualViewport;
+  return {
+    w: Math.floor(vv ? vv.width : window.innerWidth),
+    h: Math.floor(vv ? vv.height : window.innerHeight),
+  };
+}
+
+function initConfetti() {
+  resizeConfettiCanvas();
+  window.addEventListener('resize', resizeConfettiCanvas);
+}
+
+function resizeConfettiCanvas() {
+  const c = document.getElementById('confetti-canvas');
+  if (!c) return;
+  const { w, h } = getViewportSize();
+  c.width = w;
+  c.height = h;
+  c.style.width = `${w}px`;
+  c.style.height = `${h}px`;
+}
+
+function spawnConfetti(count = 120) {
+  const { w, h } = getViewportSize();
+  for (let i = 0; i < count; i++) {
+    confetti.particles.push({
+      x: Math.random() * w,
+      y: -20 - Math.random() * h * 0.4,
+      w: 4 + (Math.random() * 5 | 0),
+      h: 5 + (Math.random() * 6 | 0),
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: 1.5 + Math.random() * 3.5,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.15,
+      color: CONFETTI_COLORS[(Math.random() * CONFETTI_COLORS.length) | 0],
+      life: 0,
+      maxLife: 3500 + Math.random() * 2500,
+    });
+  }
+  confetti.active = true;
+  startOverlayLoop();
+}
+
+function updateConfetti(dt) {
+  const { h } = getViewportSize();
+  const hadParticles = confetti.particles.length > 0;
+  confetti.particles = confetti.particles.filter((p) => {
+    p.life += dt;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.018;
+    p.rot += p.vr;
+    return p.life < p.maxLife && p.y < h + 30;
+  });
+  if (confetti.particles.length === 0) {
+    if (confetti.active || hadParticles) onConfettiFinished();
+    confetti.active = false;
+  }
+}
+
+function onConfettiFinished() {
+  if (awaitingCelebrationConfettiEnd) {
+    awaitingCelebrationConfettiEnd = false;
+    showWishButton();
+  }
+}
+
+function drawConfetti() {
+  const c = document.getElementById('confetti-canvas');
+  if (!c) return;
+  const cx = c.getContext('2d');
+  const { w, h } = getViewportSize();
+  cx.clearRect(0, 0, w, h);
+  for (const p of confetti.particles) {
+    cx.save();
+    cx.translate(p.x, p.y);
+    cx.rotate(p.rot);
+    cx.fillStyle = p.color;
+    cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cx.restore();
+  }
+}
+
+function initIntro() {
+  const sw = document.getElementById('light-switch');
+  if (!sw) return;
+  sw.addEventListener('click', turnOnLight);
+}
+
+function turnOnLight() {
+  const intro = document.getElementById('intro-screen');
+  const main = document.getElementById('main-screen');
+  const sw = document.getElementById('light-switch');
+  if (!intro || !main || !sw || sw.disabled) return;
+
+  sw.disabled = true;
+  sw.classList.add('on');
+
+  setTimeout(() => {
+    intro.classList.add('hidden');
+    main.hidden = false;
+    document.body.classList.remove('intro-active');
+    document.body.classList.add('cake-active');
+    resize();
+    spawnConfetti(140);
+    updateBlowHintPosition();
+    startOverlayLoop();
+  }, 280);
+}
+
+function updateBlowHintPosition() {
+  const hint = document.getElementById('blow-hint');
+  if (!hint || hint.classList.contains('hidden') || !layout || !spriteReady()) return;
+
+  const head = cakeInteract.smokeHeadroom || 0;
+  const rect = canvas.getBoundingClientRect();
+  const fx = (cakeInteract.flameOrigin.x + 0.5) / cakeSprite.width;
+  const fy = (cakeInteract.flameOrigin.y + head + 0.5) / cakeSprite.height;
+  const flameX = rect.left + fx * rect.width;
+  const flameY = rect.top + fy * rect.height;
+
+  hint.style.left = `${flameX}px`;
+  hint.style.top = `${Math.max(12, flameY - hint.offsetHeight - 32)}px`;
+  hint.style.transform = 'translateX(-50%)';
+}
+
+function fitSceneTitle(titleEl) {
+  if (!titleEl) return;
+
+  const maxWidth = Math.max(120, getViewportSize().w - TITLE_HPAD_PX);
+  const saved = {
+    maxHeight: titleEl.style.maxHeight,
+    overflow: titleEl.style.overflow,
+    position: titleEl.style.position,
+    left: titleEl.style.left,
+  };
+
+  titleEl.style.maxHeight = 'none';
+  titleEl.style.overflow = 'visible';
+  titleEl.style.position = 'absolute';
+  titleEl.style.left = '-9999px';
+
+  let size = TITLE_MIN_PX;
+  for (let px = TITLE_MAX_PX; px >= TITLE_MIN_PX; px--) {
+    titleEl.style.fontSize = `${px}px`;
+    if (titleEl.offsetWidth <= maxWidth) {
+      size = px;
+      break;
+    }
+  }
+
+  document.documentElement.style.setProperty('--title-size', `${size}px`);
+  titleEl.style.fontSize = '';
+  titleEl.style.maxHeight = saved.maxHeight;
+  titleEl.style.overflow = saved.overflow;
+  titleEl.style.position = saved.position;
+  titleEl.style.left = saved.left;
+}
+
+function fitSurpriseTitle() {
+  fitSceneTitle(document.getElementById('surprise-title'));
+}
+
+function fitBirthdayTitle() {
+  fitSceneTitle(document.getElementById('birthday-title'));
+}
+
+function layoutCelebrationPosition() {
+  const celebration = document.getElementById('celebration-text');
+  if (!celebration || !celebration.classList.contains('visible')) return;
+
+  celebration.style.top = '12px';
+  celebration.style.maxHeight = 'none';
+}
+
+function fitBirthdayNote() {
+  const note = document.getElementById('birthday-note');
+  const celebration = document.getElementById('celebration-text');
+  const title = document.getElementById('birthday-title');
+  if (!note || !celebration || !celebration.classList.contains('visible') || !title) return;
+
+  layoutCelebrationPosition();
+
+  const titleWidth = title.offsetWidth;
+  document.documentElement.style.setProperty('--note-width', `${titleWidth}px`);
+
+  const noteSize = Math.max(NOTE_MIN_PX, Math.round(getTitleSizePx() * 0.4));
+  document.documentElement.style.setProperty('--note-size', `${noteSize}px`);
+}
+
+function fitCelebrationText() {
+  const celebration = document.getElementById('celebration-text');
+  if (!celebration || !celebration.classList.contains('visible')) return;
+  layoutCelebrationPosition();
+  fitBirthdayNote();
+}
+
+function showCelebration() {
+  const celebration = document.getElementById('celebration-text');
+  if (!celebration || celebration.classList.contains('visible')) return;
+
+  const blowHint = document.getElementById('blow-hint');
+  if (blowHint) blowHint.classList.add('hidden');
+
+  const surprise = document.getElementById('surprise-text');
+  if (surprise) surprise.classList.add('hidden');
+
+  celebration.classList.add('visible');
+  celebration.setAttribute('aria-hidden', 'false');
+  fitCelebrationText();
+  requestAnimationFrame(() => fitCelebrationText());
+  awaitingCelebrationConfettiEnd = true;
+  spawnConfetti(160);
+  startOverlayLoop();
+}
+
+function updateWishButtonPosition() {
+  const btn = document.getElementById('wish-button');
+  if (!btn || btn.hidden) return;
+
+  const rect = canvas.getBoundingClientRect();
+  btn.style.left = `${rect.left + rect.width / 2}px`;
+  btn.style.top = `${rect.bottom + 16}px`;
+}
+
+function showWishButton() {
+  const btn = document.getElementById('wish-button');
+  const celebration = document.getElementById('celebration-text');
+  if (!btn || wishButtonShown || !celebration || !celebration.classList.contains('visible')) return;
+
+  wishButtonShown = true;
+  btn.hidden = false;
+  updateWishButtonPosition();
+  requestAnimationFrame(() => btn.classList.add('visible'));
+}
+
+function openWishNote() {
+  const overlay = document.getElementById('wish-note-overlay');
+  const input = document.getElementById('wish-input');
+  if (!overlay || !input) return;
+
+  overlay.hidden = false;
+  input.value = '';
+  requestAnimationFrame(() => input.focus());
+}
+
+function closeWishNote() {
+  const overlay = document.getElementById('wish-note-overlay');
+  const input = document.getElementById('wish-input');
+  if (!overlay) return;
+
+  overlay.hidden = true;
+  if (input) input.value = '';
+}
+
+function initWishFlow() {
+  const btn = document.getElementById('wish-button');
+  const overlay = document.getElementById('wish-note-overlay');
+  const submit = document.getElementById('wish-submit');
+  const input = document.getElementById('wish-input');
+
+  if (btn) {
+    btn.addEventListener('click', openWishNote);
+  }
+
+  if (submit) {
+    submit.addEventListener('click', closeWishNote);
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeWishNote();
+    });
+  }
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeWishNote();
+    });
+  }
 }
 
 // ─── Scene layout ──────────────────────────────────────────────────────────
@@ -319,19 +625,9 @@ ctx.imageSmoothingEnabled = false;
 
 let cakeSprite = null;
 let layout = null;
-let animFrame = null;
-let lastFrameTime = 0;
 
 function spriteReady() {
   return cakeSprite !== null;
-}
-
-function getViewportSize() {
-  const vv = window.visualViewport;
-  return {
-    w: Math.floor(vv ? vv.width : window.innerWidth),
-    h: Math.floor(vv ? vv.height : window.innerHeight),
-  };
 }
 
 function getLayoutConfig(viewportW, viewportH) {
@@ -416,7 +712,7 @@ function startCandleHold(pointerId, clientX, clientY) {
   cakeInteract.holding = true;
   cakeInteract.holdStart = performance.now();
   cakeInteract.pointerId = pointerId;
-  startAnimationLoop();
+  startOverlayLoop();
   return true;
 }
 
@@ -425,32 +721,46 @@ function endCandleHold(pointerId) {
   cakeInteract.holding = false;
   cakeInteract.pointerId = null;
   if (!cakeInteract.blownOut && cakeInteract.blowProgress < 1) {
-    startAnimationLoop();
+    startOverlayLoop();
   }
 }
 
-function startAnimationLoop() {
-  if (animFrame !== null) return;
-  lastFrameTime = performance.now();
-  animFrame = requestAnimationFrame(animationTick);
+function needsAnimationFrame() {
+  if (confetti.active) return true;
+  if (mainScreenActive() && (cakeNeedsAnimation() || cakeInteract.holding)) return true;
+  return false;
 }
 
-function animationTick(now) {
+function startOverlayLoop() {
+  if (overlayFrame !== null) return;
+  lastFrameTime = performance.now();
+  overlayFrame = requestAnimationFrame(overlayTick);
+}
+
+function overlayTick(now) {
   const dt = now - lastFrameTime;
   lastFrameTime = now;
-  updateCakeInteract(now, dt);
-  cakeSprite = renderCakeDisplay();
-  drawScene();
 
-  if (cakeNeedsAnimation() || cakeInteract.holding) {
-    animFrame = requestAnimationFrame(animationTick);
+  if (mainScreenActive()) {
+    updateCakeInteract(now, dt);
+    cakeSprite = renderCakeDisplay();
+    drawScene();
+  }
+
+  if (confetti.active) {
+    updateConfetti(dt);
+    drawConfetti();
+  }
+
+  if (needsAnimationFrame()) {
+    overlayFrame = requestAnimationFrame(overlayTick);
   } else {
-    animFrame = null;
+    overlayFrame = null;
   }
 }
 
 function resize() {
-  if (!spriteReady()) return;
+  if (!spriteReady() || !mainScreenActive()) return;
 
   ctx.imageSmoothingEnabled = false;
   layout = measureLayout();
@@ -470,6 +780,16 @@ function resize() {
 
   ctx.setTransform(displayScale, 0, 0, displayScale, 0, 0);
   cakeInteract.displayScale = displayScale;
+
+  const celebration = document.getElementById('celebration-text');
+  if (celebration && celebration.classList.contains('visible')) {
+    fitCelebrationText();
+  } else {
+    fitSurpriseTitle();
+  }
+
+  updateBlowHintPosition();
+  updateWishButtonPosition();
   cakeSprite = renderCakeDisplay();
   drawScene();
 }
@@ -489,7 +809,7 @@ function drawScene() {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (!layout || !spriteReady()) return;
+  if (!mainScreenActive() || !layout || !spriteReady()) return;
   if (startCandleHold(e.pointerId, e.clientX, e.clientY)) {
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -517,8 +837,12 @@ if (window.visualViewport) {
 loadCakeSprite()
   .then((cake) => {
     cakeSprite = cake;
-    resize();
-    startAnimationLoop();
+    return document.fonts.load('16px "Pixelated Display"');
+  })
+  .then(() => {
+    initConfetti();
+    initIntro();
+    initWishFlow();
   })
   .catch((err) => {
     console.error(err);
