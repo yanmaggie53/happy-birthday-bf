@@ -185,6 +185,7 @@ function updateCakeInteract(now, dt) {
       spawnSmokePuffs();
       const blowHint = document.getElementById('blow-hint');
       if (blowHint) blowHint.classList.add('hidden');
+      hideFlameTouch();
       setTimeout(showCelebration, CELEBRATION_DELAY_MS);
       startOverlayLoop();
     }
@@ -706,9 +707,8 @@ function hitCandle(sceneX, sceneY) {
     && local.y < hit.y + head + hit.h;
 }
 
-function startCandleHold(pointerId, clientX, clientY) {
-  const pt = scenePointFromClient(clientX, clientY);
-  if (!hitCandle(pt.x, pt.y)) return false;
+function startCandleHold(pointerId) {
+  if (cakeInteract.blownOut) return false;
 
   cakeInteract.holding = true;
   cakeInteract.holdStart = performance.now();
@@ -724,6 +724,77 @@ function endCandleHold(pointerId) {
   if (!cakeInteract.blownOut && cakeInteract.blowProgress < 1) {
     startOverlayLoop();
   }
+}
+
+function hideFlameTouch() {
+  const el = document.getElementById('flame-touch');
+  if (el) el.hidden = true;
+}
+
+function updateFlameTouchTarget() {
+  const el = document.getElementById('flame-touch');
+  if (!el || !mainScreenActive() || !layout || !spriteReady() || cakeInteract.blownOut) {
+    hideFlameTouch();
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const hit = cakeInteract.candleHit;
+  const head = cakeInteract.smokeHeadroom || 0;
+  const pad = 16;
+
+  const left = rect.left + (hit.x / cakeSprite.width) * rect.width;
+  const top = rect.top + ((hit.y + head) / cakeSprite.height) * rect.height;
+  const width = (hit.w / cakeSprite.width) * rect.width;
+  const height = (hit.h / cakeSprite.height) * rect.height;
+
+  el.style.left = `${left - pad}px`;
+  el.style.top = `${top - pad}px`;
+  el.style.width = `${width + pad * 2}px`;
+  el.style.height = `${height + pad * 2}px`;
+  el.hidden = false;
+}
+
+function initFlameTouch() {
+  const el = document.getElementById('flame-touch');
+  if (!el) return;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (!mainScreenActive() || !layout || !spriteReady()) return;
+    if (startCandleHold(e.pointerId)) {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+  });
+
+  el.addEventListener('pointerup', (e) => {
+    endCandleHold(e.pointerId);
+  });
+
+  el.addEventListener('pointercancel', (e) => {
+    endCandleHold(e.pointerId);
+  });
+
+  el.addEventListener('pointerleave', (e) => {
+    if (cakeInteract.pointerId === e.pointerId) endCandleHold(e.pointerId);
+  });
+
+  el.addEventListener('touchstart', (e) => {
+    if (cakeInteract.blownOut) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  el.addEventListener('touchmove', (e) => {
+    if (cakeInteract.holding) e.preventDefault();
+  }, { passive: false });
+
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  });
+
+  document.addEventListener('selectstart', (e) => {
+    if (cakeInteract.holding) e.preventDefault();
+  }, true);
 }
 
 function needsAnimationFrame() {
@@ -790,6 +861,7 @@ function resize() {
   }
 
   updateBlowHintPosition();
+  updateFlameTouchTarget();
   updateWishButtonPosition();
   cakeSprite = renderCakeDisplay();
   drawScene();
@@ -809,28 +881,8 @@ function drawScene() {
   );
 }
 
-canvas.addEventListener('pointerdown', (e) => {
-  if (!mainScreenActive() || !layout || !spriteReady()) return;
-  if (startCandleHold(e.pointerId, e.clientX, e.clientY)) {
-    e.preventDefault();
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-  }
-});
-
 canvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-});
-
-canvas.addEventListener('pointerup', (e) => {
-  endCandleHold(e.pointerId);
-});
-
-canvas.addEventListener('pointercancel', (e) => {
-  endCandleHold(e.pointerId);
-});
-
-canvas.addEventListener('pointerleave', (e) => {
-  if (cakeInteract.pointerId === e.pointerId) endCandleHold(e.pointerId);
 });
 
 window.addEventListener('resize', resize);
@@ -848,6 +900,7 @@ loadCakeSprite()
     initConfetti();
     initIntro();
     initWishFlow();
+    initFlameTouch();
   })
   .catch((err) => {
     console.error(err);

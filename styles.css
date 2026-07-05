@@ -213,6 +213,9 @@ body.cake-active {
 
 .surprise-text {
   opacity: 1;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
   transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
@@ -233,6 +236,8 @@ body.cake-active {
   overflow: visible;
   opacity: 0;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
   transform: translateX(-50%) translateY(0.5rem);
   transition: opacity 0.9s ease, transform 0.9s ease;
 }
@@ -281,7 +286,26 @@ body.cake-active {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  pointer-events: none;
   cursor: default;
+}
+
+.flame-touch {
+  position: fixed;
+  z-index: 35;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+}
+
+.flame-touch[hidden] {
+  display: none;
 }
 
 /* ─── Confetti ─────────────────────────────────────────────────────────────── */
